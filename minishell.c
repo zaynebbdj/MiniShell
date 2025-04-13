@@ -10,15 +10,17 @@
 #define MAX_ARGS 16
 #define BUFFER_SIZE 1024
 
+// ctrl-C handler ( stop execution of a program)
 void sigint_handler(int sig) {
     printf("\nUse 'exit' to quit the shell.\n$");
     fflush(stdout);
 }
 
+// return the number of argument
 int parse_line(char *s, char *argv[]) {
     int count = 0;
-    char *token = strtok(s, " \t\n");
-    while (token != NULL && count < MAX_ARGS) {
+    char *token = strtok(s, " \t\n"); // first token
+    while (token != NULL && count < MAX_ARGS) { // all next tokens
         argv[count++] = token;
         token = strtok(NULL, " \t\n");
     }
@@ -31,8 +33,8 @@ void execute_command(char *argv[]) {
     int i = 0;
     int pipe_pos = -1;
     int redirect_pos = -1;
-    
-    while (argv[i] != NULL) {
+    // find pipe position or redirection position in the arguments
+    while (argv[i] != NULL) { 
         if (strcmp(argv[i], "|") == 0) {
             pipe_pos = i;
             break;
@@ -44,8 +46,8 @@ void execute_command(char *argv[]) {
         i++;
     }
 
-    // handle pipes
-    if (pipe_pos != -1) {
+    
+    if (pipe_pos != -1) { // case with pipe, creation of two process communicating with each other
         argv[pipe_pos] = NULL;
         int pipefd[2];
         if (pipe(pipefd) == -1) {
@@ -74,24 +76,24 @@ void execute_command(char *argv[]) {
         close(pipefd[1]);
         wait(NULL);
         wait(NULL);
-    } else if (redirect_pos != -1) {           // output redirection
+    } else if (redirect_pos != -1) {           // case redirection
         argv[redirect_pos] = NULL;
-        fd = open(argv[redirect_pos + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        fd = open(argv[redirect_pos + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);  // new output
         if (fd == -1) {
             perror("open");
             exit(EXIT_FAILURE);
         }
         pid_t pid = fork();
         if (pid == 0) {
-            dup2(fd, STDOUT_FILENO);
+            dup2(fd, STDOUT_FILENO); // stdout refers to the choosen output fd
             close(fd);
-            execvp(argv[0], argv);
+            execvp(argv[0], argv);   // execution
             perror("execvp");
             exit(EXIT_FAILURE);
         }
         close(fd);
         wait(NULL);
-    } else {          //  command execution
+    } else {          //  command execution, in case of no pipe and no redirection
         pid_t pid = fork();
         if (pid == 0) {
             execvp(argv[0], argv);
@@ -106,8 +108,8 @@ int main() {
     char input[BUFFER_SIZE];
     char *argv[MAX_ARGS + 1];
     
-    signal(SIGINT, sigint_handler);
-    
+    signal(SIGINT, sigint_handler); // signal hndler
+    // minishell main loop
     while (1) {
         printf("$ ");
         fflush(stdout);
@@ -116,12 +118,13 @@ int main() {
             printf("\nExiting shell.\n");
             break;
         }
-        
+        // exit minishell
         if (strcmp(input, "exit\n") == 0) {
             break;
         }
-        
+        // find the number of argument
         int arg_count = parse_line(input, argv);
+        // execute input
         if (arg_count > 0) {
             execute_command(argv);
         }
